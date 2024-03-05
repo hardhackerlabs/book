@@ -1,0 +1,36 @@
+得益于近些年云计算的快速发展，不只是 IaaS，更多的 PaaS 产品横空出世，现在构建产品的成本越来越低了，甚至可以做到除了域名之外 0 成本购买。Podwise 在构建产品的过程中当然也完全践行了能省则省的原则。
+Podwise 在最终的选型上，使用了 Vercel、Supabase、Amazon SES 和 Lemon Squeezy，几乎做到了零成本。
+
+在为什么选择 Lemon Squeezy 上最核心的原因是因为 Stripe 对于注册要求门槛比较高，需要有相关的税务资质。虽然 Stripe 相对来说是综合费率最低的，但在当时的环境下还是选择了对于独立开发者相对友好的 Lemon Squeezy 来使用。虽然 Lemon Squeezy 的综合费率较高，但相应的也提供了一个额外的 affiliate 服务，可以让开发者利用 Lemon Squeezy 平台来发展代销网络以及分润，这对开发者来说也相当友好了。另外如果你的年度营收超过 10 万美金，也可以尝试向 Lemon Squeezy 发邮件申请降低费率，这也是他们平台的一项扶持政策。
+
+在成本控制方面，通用服务相关几乎 0 成本了，但对于 AI 产品来说，想做到零成本就几乎不可能了，而且 AI 产品一定要计算销售毛利，免费策略要谨慎使用，随意定价的结果很可能会血本无归。
+
+Podwise 是一个播客语音转文字的服务，我们在 AI 领域会用到两个最基础的服务：
+
+- Whisper：用于语音转文字，由 OpenAI 开源，并且也有商用服务提供
+- ChatGPT：LLM 服务，由 OpenAI 提供，用于总结、大纲、摘要、名词解释等用途
+
+Whisper 的商用服务价格为：$0.006/m。 换算为一小时的播客节目的话费用为 $0.36，接近 ¥2.6 一集，这个成本可想而知。
+
+ChatGPT 经历过几次降价，并且区分 GPT4 和 GPT 3.5。价格如下表：
+
+|  | Older Models | New Models |
+| --- | --- | --- |
+| GPT-4 Turbo | GPT-4 8K<br /> Input: $0.03<br /> Output: $0.06 | GPT-4 Turbo 128K<br /> Input: $0.01<br /> Output: $0.03 |
+| GPT-3.5 Turbo | GPT-3.5 Turbo 16K<br />Input: $0.003<br />Output: $0.004 | GPT-3.5 Turbo 16K<br />Input: $0.001<br />Output: $0.002 |
+
+如果我们以 1 小时英文播客计算的话，语速一分钟 180 单词左右，那么一期播客会有大概 10000 单词，换算到 OpenAI 的 Token 计数，同时叠加 Prompt 以及输出的 Token 计算，那么会消耗 20000 左右的 Tokens。
+
+按 Tokens 计算，未降价前 GPT-3.5 和 GPT-4 成本分别为：$0.07 和 $0.8，降价后成本为：$0.025 和 $0.3。
+
+由于在 Podwise 构建当时，OpenAI 还未降价，所以以当时的成本计算，1 小时的英文播客，如果完全使用商业服务，GPT-4 版本需要 $1.16 一期，而 GPT-3.5 版本也需要 $0.43 一期。如果订阅版本中提供 20 期的节目转录，平均一期一个半小时，GPT-3.5 的成本需要 $12.9 左右，GPT-4 版本那就更是天价了。所以如何降低成本就变成非常重要的一件事。
+
+首先是 Whisper，由于 Whisper 是开源的，而且业界有不少针对 Whisper 的优化版本，所以优先思考的就是是否可以将 Whisper 跑在自己的服务器上，这样每小时节目就可以节省 $0.3，这是一笔不菲的费用。所以开始阶段的 Podwise 节目背后其实都是用 Macbook 与 Mac Studio 在背后支撑的，得益于开源项目对于 Mac M 系列芯片的不断优化，一小时的音频在 M1 Max 机器上从 20 分钟提升到了 10 分钟以内，感谢开源。这样我们就把费用顺利的转化为 M 系列芯片的电费，众所周知，M 系列芯片能耗比非常好，100瓦足以满载工作。满载工作 10 个小时消耗 1 度电，按 ¥1 计算的话成本简直不要太低。
+
+在我们利用高能耗比的 M 系列芯片节约成本之时，突然有 AWS Startup Program 的同学找到我们，问我们是否愿意申请 AWS 的 Startup Program，成功的话最少有 $25000 的 Credit。这对我们来说简直的天上掉下来的馅饼，由于是 AI 创业项目，申请的过程格外的顺利，最终我们拿到了 $10000 的额度可以用于购买 ECS 服务器，但 Credit 有使用时间限制，周期为 6 个月，但因为是免费额度，我们很快将家用机切换为高性能 v100 服务器，服务的效率也快速提升，后来我才知道，其实 AWS、Azure 和 Google 都有针对 Startup 的 Program，且补贴都不低。尤其是 Microsoft for Startups，额外赠送 $2500 OpenAI 额度，这对于 AI 创业者来说简直是白捡的，而且一定会用到的福利。当我们注意到 Microsoft for Startups 的 OpenAI 额度的时候，我们已经花了 $1000 左右了，这些钱本可以省下来变成利润的，所以在这里强烈建议 AI 创业者先去申请 Microsoft for Startups。以下是三个 Startup Program，有需求的同学强烈建议按需申请，注意 Credit 一般都有使用时间的限制，需要在 6 个月到 1 年的时间内消耗完毕，所以建议错开时间申请，这样可以最大化利用云厂商的免费额度。
+
+- AWS：https://aws.amazon.com/startups
+- Azure：https://www.microsoft.com/en-us/startups
+- Google：https://startup.google.com/programs/
+
+2023年12月14日，Google 终于在 LLM 领域发力，推出了与 ChatGPT 能力接近的模型 Gemini，甚至在自己的评测中，Ultra 版本能力全面超越 GPT-4。其实对于新模型来说，如果能力只是与 GPT-4 接近，即使价格便宜一些，可能也不会引起太大的波澜，但 Gemini 推出了一个针对所有人免费的 Gemini Pro 版本，重点是完全免费，且 60 QPM，这对于 Podwise 这类应用来说完全够用，在经过长时间的测试后，我们判断 Gemini Pro 的能力确实与 GPT-3.5 有一战之力，我们做出了一个 Gemini Pro 与 GPT-3.5 并行支持 Podwise 的决定，又节省了一半的成本。
