@@ -1,4 +1,9 @@
 {
+  "name": "podwise-book",
+  "version": "0.1.0",
+  "author": {
+    "name": "HardHackerLabs"
+  },
   "scripts": {
     "dev": "next",
     "build": "next build",
