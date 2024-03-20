@@ -22,13 +22,13 @@
 
 [Podwise](https://podwise.ai/) 是一款专为播客听友设计的 AI 知识管理应用。 利用 Podwise 平台，你只需 follow 喜欢的播客，比如「硬地骇客」，当有节目发布后，Podwise 会通过 AI 对播客内容进行 转录、提取、总结、分析 等一系列操作，帮你掰开了揉碎了硬核的播客知识。同时与 Notion、Obsidian、Logseq 和 Readwise 等平台的打通，嵌入你的知识管理工作流，协同在其他渠道的包括新闻，Newsletter，Blog 等内容，帮你完善第二大脑 🧠。
 
-Podwise 今天的成绩远称不上成功，可能勉强算是找到 PMF (Product Market Fit)，所以这不是一份权威指南，内容仅供参考。
+Podwise 今天的成绩远称不上成功，可能勉强算是找到 PMF (Product-Market Fit)，所以这不是一份权威指南，内容仅供参考。
 
 全书以产品的全生命周期划分为 5 个部分：
 
 <details open>
   <summary>💡 灵感</summary>
-  
+
   * 从社区出发
   * 百万美金的利基市场
   * MVP MVP MVP
@@ -44,21 +44,21 @@ Podwise 今天的成绩远称不上成功，可能勉强算是找到 PMF (Produc
 </details>
 <details open>
   <summary>🚀 发布</summary>
-  
+
   * 最初的 200 个用户
   * 永远跟用户站在一起
   * 定价要关注成本
 </details>
 <details open>
   <summary>💸 增长</summary>
-  
+
   * 到杠杆高的地方去做宣传
   * 互动、回复、关注长尾
   * 意料之外的爆发
 </details>
 <details open>
   <summary>🤔 复盘</summary>
-  
+
   * 对远景的一些规划
   * 最不应该犯的错误
   * 还会坚持干的几件事
