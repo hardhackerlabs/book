@@ -10,20 +10,29 @@ title: 用方便且擅长的技术栈
 - 移动端（计划中）：CapacitorJS
 
 虽然在选型过程中也有一些 feature 上的考量，但最核心的原则还是：**选择擅长且方便的。**
+
 很多人在做一个新项目的时候会倾向于选择新技术。虽然有时候新技术本身能带来一些优势，但因为我们不熟悉这项新技术，或新技术本身不成熟而存在的问题，都会导致我们在这方面付出很多时间成本。而除非新技术带来的优势就是你的产品的竞争力，否则这些优势几乎不可能超过你因为使用新技术而产生的额外成本。
 
 **Web 前后端为什么选择 JS/TS 技术栈？**
+
 我们团队比较熟悉的技术栈是 JavaScript/TypeScript 、Golang 、Java 、Ruby 、Rust 。对于开发 Web 应用来说，显然使用 JS/TS 全栈一站式搞定是最快捷方便的。尽管 Java 、Golang 包括 Rust 在性能方面相对 Node 会更有优势，但对于大部分开销都在数据库和网络 I/O 上的 Web 后端来说并没有多大意义。另外 Web 前后端开发由同一个人承担，那使用同样的技术栈肯定也会更加方便。所以 Web 前后端就决定使用 JS/TS 技术栈。
 
 **为什么选择 TS 而非开发速度更快的 JS ？**
+
 JS 在一人工作以及 POC 阶段效率确实很高，但当工程开始变得复杂且经过长期迭代之后，TS 会更具优势。当工程已经颇具规模之后再切换到 TS 会是一个很痛苦的过程。我一般仅在知道工程规模会长期保持轻量的时候选择使用 JS 。
+
 很多人被 TS 灵活的类型系统搞的无所适从，花费很多时间在类型适配上，或把 TypeScript 写成了 AnyScript 。但实际上对于上层应用开发来说，我们大部分时候只需要使用第三方包暴露的类型就够了。同时我们也可以通过一些技巧来提取未被暴露的类型，例如使用 Utility Types `Awaited<>` `Parameters<>` `ReturnType<>` 等。
 
 **为什么选择 NextJS 作为 Web framework ？**
+
 NextJS 提供了一些吸引人的特性，例如：前后端同构、SEO 友好、ServerAction 、Vercel 快速部署等。当时我们因为已经脱离一线开发一段时间了，其实对当时主流 Web framework 的细节也并不了解，在快速评估了 NextJS 、Astro 和 Remix 之后，我们认为 NextJS 更加符合我们的需求。尽管这个选择帮助我们快速开发并上线了 [Podwise.ai](http://podwise.ai/) ，但也同样给我们带来了不少麻烦，在后面我们会讨论这些麻烦。
+
 前后端同构在一人开发时效率很高。举例来说，所有接口的出入参类型你都只需要定义一份，而无需在两种不同技术栈下分开定义。当你需要修改接口时，同一份类型也可以确保你同时修改两边而不会发生遗漏。
+
 SEO 作为一种出海场景下有效且相对便宜的营销获客手段，是非常必要的。如果你的 SEO 内容都是 blog 文章，那完全可以为 blog 站点选择一个独立的技术栈，或者干脆使用 medium 这样的服务作为你的 blog 站点。但当你的应用内容本身就需要被 SEO 时，为你的应用开发选择一个支持 SEO 的技术栈就比较有必要。
+
 Astro 本身定位自己是用来做 “content-driven websites” ，内容驱动网站，也就是说像营销站点、文档站点、blog 、landing page 这种场景。对于功能比较复杂的应用网站，Astro 官方也并不推荐使用 Astro 来构建。
+
 Remix 看起来是一个不错的选择，但它的 action 将一个页面的所有请求混合在一起的写法让我有点不太能接受，而当时 NextJS 的 ServerAction 看起来会更加吸引人。
 
 **纯后端服务为什么选择 Golang 技术栈？**
@@ -122,14 +131,21 @@ langchain 框架有这样的几个核心部分：model IO，Retrieval，Chain，
 - shadcn/ui 是一个优秀的 React UI 组件库，样式简洁美观，组件可以按需安装和更新。更重要的是它基于 TailwindCSS 编写样式，并通过复制的方式安装到你的工程中。因此我们可以很轻松的使用 TailwindCSS 来覆盖样式，或直接修改代码来改变它的默认样式和行为。除了 shadcn/ui 之外，radix-ui themes 和 NextUI 也是不错的组件库选择。
 
 **这个技术选型下遇到的问题。**
+
 最大的问题来自对 NextJS 和 CapacitorJS 的不熟悉。原本我们计划使用 CapacitorJS 来包壳开发 App ，避免重复同样的业务逻辑开发。对于小团队来说，在多端用不同语言重复实现的时间成本有点不可接受，同时也是非常不利于体验一致和长期维护的。
+
 但 CapacitorJS 需要被包壳的 Web 应用是一个标准的 SPA（Single Page Application），而 NextJS 是一个对 RSC（React Server Component）和 SSR（Server Side Render）高度优化的框架。尽管 NextJS 也可以用于开发 SPA 应用，但很多 NextJS 的有用特性就无法使用了。我们在最初并没有关注到这个限制，结果直到开始准备包壳的时候才发现。这直接导致我们需要对整个 Podwise 的 website 应用进行改造和重构，才能适用 CapacitorJS 来包壳。与此同时，我们还要确保 web 端的 SEO 内容可以被继续输出。目前我们计划通过自定义打包脚本，在尽可能复用代码的同时保留一定的差异化。
+
 一个和 App 包壳相关联的问题是 NextJS 提供的 ServerAction 特性。ServerAction 可以让开发者以类型安全的方式，像调用本地方法一样从 browser 端调用 server 端的接口。ServerAction 使用起来非常方便，然而这也同样是一柄双刃剑。ServerAction 本身不被 NextJS 的静态导出方式（导出成 SPA）所支持，同时也不是一个标准的 RestAPI ，无法被其它二方或三方调用。我们最初用 ServerAction 用的多爽，当决定弃用它的时候就有多麻烦。
+
 Web 启动是比较轻量的，也便于试错。但如果你在后面的计划中有 App 的需求，那么我会非常建议在动手 Web 端编码之前先预研一下后面的 App 方案。
+
 此外 Vercel 作为我们的主要部署平台，也给我们带来了一些麻烦。像 Vercel 以及 Netlify 这些类似平台，都使用 AWS lambda 作为他们 Serverless 能力的底层设施。AWS lambda 在安装它的基础镜像不包含的依赖库时需要使用自定义 layers 来完成，而 Vercel 和 Netlify 等都不支持自定义 layers 。这就导致当我们开发的功能需要使用到一些 AWS lambda 基础镜像中并没有预先安装的依赖库时，无法被成功部署到 Vercel 或 Netlify 中。例如我们的 DAI（Dynamic ADs Insertion）检测功能需要使用到 `libasound.so.2` 而 AWS lambda 基础镜像中没有，我们尝试了很多种方式都没有成功完成部署，包括 Vercel 的官方 support 给出的结论也是需要等待他们支持 layers 才可以。最终我们只能把这部分功能剥离出来单独部署，我们选择了 zeabur 来部署这一小部分。
 
 **在经历这一切之后重新选择技术栈的话，我们会怎么选？**
+
 绝大多数选择我认为都没有问题，而 Web framework 我想我会考虑一下 Remix 。Remix 看起来能很好的满足 CapacitorJS 所需的 SPA 结构，无需做什么特殊处理。同时 Remix 也具备前后端同构，SEO 友好的特点。也同样能非常方便的在 Vercel 或 Netlify 等主流平台上部署。
+
 对于我们遇到的 Vercel 无法安装额外依赖库的问题，我并不会因为这个问题而选择不使用 Vercel 或类似的 Netlify 等平台。Vercel 这样的一站式平台带来的其他价值完全值得我们继续选择它，能大大提升产品的迭代交付速度。
 
 **我们的技术选型建议：**
