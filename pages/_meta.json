@@ -6,5 +6,19 @@
   "launch": "发布",
   "grow": "增长",
   "review": "复盘",
-  "authors": "作者"
+  "authors": "作者",
+  "about": {
+    "title": "更多",
+    "type": "menu",
+    "items": {
+      "podwise": {
+        "title": "Podwise AI",
+        "href": "https://podwise.ai"
+      },
+      "homepage": {
+        "title": "HardHackerLabs",
+        "href": "https://hardhacker.com"
+      }
+    }
+  }
 }
