@@ -30,14 +30,14 @@ Podwise 今天的成绩远称不上成功，可能勉强算是找到 PMF (Produc
   <summary>💡 灵感</summary>
 
   * [从社区出发](https://book.hardhacker.com/idea/community)
-  * [百万美金的利基市场](https://book.hardhacker.com/idea/market)
+  * [百万美金的利基市场](https://book.hardhacker.com/idea/millions)
   * [MVP MVP MVP](https://book.hardhacker.com/idea/mvp)
 </details>
 <details open>
   <summary>🛠 构建</summary>
 
   * [设计与开发一体](https://book.hardhacker.com/build/design)
-  * [用方便且擅长的技术栈](https://book.hardhacker.com/build/stack)
+  * [用方便且擅长的技术栈](https://book.hardhacker.com/build/buildstack)
   * [关于大模型必须知道的事](https://book.hardhacker.com/build/llm)
   * [省下的都是赚的](https://book.hardhacker.com/build/saving)
   * [能用的服务千万别做](https://book.hardhacker.com/build/services)
@@ -60,7 +60,7 @@ Podwise 今天的成绩远称不上成功，可能勉强算是找到 PMF (Produc
   <summary>🤔 复盘</summary>
 
   * [对远景的一些规划](https://book.hardhacker.com/review/future)
-  * [最不应该犯的错误](https://book.hardhacker.com/review/falut)
+  * [最不应该犯的错误](https://book.hardhacker.com/review/fault)
   * [还会坚持干的几件事](https://book.hardhacker.com/review/learn)
 </details>
 
