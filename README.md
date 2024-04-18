@@ -67,7 +67,7 @@ Podwise 今天的成绩远称不上成功，可能勉强算是找到 PMF (Produc
 ## 参与讨论
 
 <p align="center">
-  <a href="https://hardhacker.com/book">
+  <a href="https://book.hardhacker.com">
     <img src="/public/attachments/other/planet.png" width="650"/>
   </a>
 </p>
