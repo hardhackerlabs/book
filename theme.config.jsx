@@ -1,4 +1,6 @@
 import { useConfig } from "nextra-theme-docs";
+import { useRouter } from 'next/router'
+
 
 export default {
   logo: <span>硬地骇客 - 两个月 $12000 ARR 实践之路</span>,
@@ -6,7 +8,7 @@ export default {
     link: "https://github.com/hardhackerlabs/book",
   },
   chat: {
-    link: "/authors",
+    link: "https://book.hardhacker.com/authors",
     icon: (
       <svg width="24" height="24" viewBox="0 0 60 60">
         <g>
@@ -31,6 +33,26 @@ export default {
       </a>
     )
   },
+  head: () => {
+    const { asPath, defaultLocale, locale } = useRouter()
+    const { frontMatter } = useConfig()
+    const url =
+      'https://book.hardhacker.com' +
+      (defaultLocale === locale ? asPath : `/${locale}${asPath}`)
+
+    return (
+      <>
+        <meta property="og:url" content={url} />
+        <meta property="og:title" content={frontMatter.title + " – 硬地骇客" || '硬地骇客'} />
+        <meta
+          property="og:description"
+          content={frontMatter.description || '两个月 $12000 ARR 实践之路'}
+        />
+        <meta property="og:image" content="https://github.com/hardhackerlabs/book/blob/main/public/attachments/other/ARR.png?raw=true" />
+      </>
+    )
+  },
+
   useNextSeoProps() {
     const { frontMatter } = useConfig();
 
