@@ -16,6 +16,25 @@
   </a>
 </p>
 
+## 参与讨论
+
+欢迎大家加入「硬地骇客」的官方星球并参与本书的讨论。
+
+<p align="center">
+  <a href="https://t.zsxq.com/19SKbmflB">
+    <img src="/public/attachments/other/planet.png" width="650"/>
+  </a>
+</p>
+
+社群提供如下服务：
+
+1. 全年不少于 24 篇专题分享，内容包括但不限于 灵感 - 构建 - 发布 - 增长 等产品关键环节。
+2. 全年 50 期左右的「硬地骇客」播客文章版内容以及参考资料，通过文章的阅读体验可以在收听节目之后方便快速检索播客内容。
+3. 为支持社群会员的产品发展，社群为每位会员提供「硬地骇客」播客节目 Show Notes 广告位一次，价值 ¥500，可为产品提供高质量的站点外链，提升搜索引擎排名。
+4. 不定期的黑客马拉松赛事，优胜者可以获得包含现金奖励与项目孵化等合作项目支持。
+
+关注前沿科技，分享创业故事，打造 “超级个体”，寻找利基市场，构建小而美的生意，同时也希望和广大 Hacker 一起探讨技术、产品和商业之美。
+
 ## 关于本书
 
 本书是关于 [Podwise](https://podwise.ai) 产品从灵感到变现过程的忠实记录以及复盘。
@@ -63,14 +82,6 @@ Podwise 今天的成绩远称不上成功，可能勉强算是找到 PMF (Produc
   * [最不应该犯的错误](https://book.hardhacker.com/review/fault)
   * [还会坚持干的几件事](https://book.hardhacker.com/review/learn)
 </details>
-
-## 参与讨论
-
-<p align="center">
-  <a href="https://t.zsxq.com/19SKbmflB">
-    <img src="/public/attachments/other/planet.png" width="650"/>
-  </a>
-</p>
 
 ## 关于作者
 
