@@ -65,14 +65,14 @@ export default {
   toc: {
     title: "目录",
     extraContent: <>
-    <span>🥳 欢迎「硬地骇客」社群！</span>
+    <span>🥳 欢迎加入「硬地骇客」社群！</span>
     <Image
       src="/attachments/other/planet.png"
       width={500}
       height={500}
       alt="knowledge planet"
     />
-    <span>与作者和读者一起交流。 💬</span>
+    <span>与作者和广大读者一起交流。 💬</span>
   </>,
   },
   editLink: {
