@@ -1,12 +1,13 @@
 {
   "index": "简介",
+  "authors": "作者",
+  "toc": "目录",
   "preface": "前言",
   "idea": "灵感",
   "build": "构建",
   "launch": "发布",
   "grow": "增长",
   "review": "复盘",
-  "authors": "作者",
   "about": {
     "title": "更多",
     "type": "menu",
