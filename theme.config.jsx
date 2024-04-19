@@ -1,5 +1,7 @@
 import { useConfig } from "nextra-theme-docs";
 import { useRouter } from 'next/router'
+import Image from 'next/image'
+
 
 
 export default {
@@ -59,6 +61,22 @@ export default {
     return {
       titleTemplate: frontMatter.title + " – 硬地骇客",
     };
+  },
+  toc: {
+    title: "目录",
+    extraContent: <>
+    <span>🥳 欢迎「硬地骇客」社群！</span>
+    <Image
+      src="/attachments/other/planet.png"
+      width={500}
+      height={500}
+      alt="knowledge planet"
+    />
+    <span>与作者和读者一起交流。 💬</span>
+  </>,
+  },
+  editLink: {
+    text: ""
   },
   // ... other theme options
   footer: {
