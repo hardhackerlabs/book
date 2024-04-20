@@ -7,7 +7,7 @@ Podwise 能够快速构建上线，背后用到了很多优秀的三方 SaaS 服
 - Vercel：一站式的应用部署托管运维平台，主要面向前端技术栈，一方支持 NextJS 。免费计划较为慷慨，在项目启动初期完全够用。
 - Zeabur：来自国内创业团队的部署托管运维平台。与 Vercel 不同的地方在于并不基于 AWS lambda 实现，并且支持容器方式部署。我们将 Zeabur 作为补充部署部分无法在 Vercel 上部署的服务。
 - Supabase：Firebase 的开源替代，提供 authentication 、database（postgresql）、storage 、edge functions 等一系列能力。SaaS 版本提供了非常慷慨的免费额度。我们仅使用了 Supabase 的 authentication 部分，实现了 Podwise 的登录注册功能。
-- PlanetScale：强大易用的 MySQL 云服务，我们的主数据源。PlanetScale 提供几乎 0 维护的在线 MySQL 实例，开发者无需关心备份、扩缩容等问题，只需要专注在业务开发。除了容灾、自动备份等基础功能，PlanetScale 还提供像不停机、不损失数据的 schema 回滚这样的高级功能。PlanetScale 的免费用量完全足够用到你的产品能养活你的时候。
+- PlanetScale：强大易用的 MySQL 云服务，我们的主数据源。PlanetScale 提供几乎 0 维护的在线 MySQL 实例，开发者无需关心备份、扩缩容等问题，只需要专注在业务开发。除了容灾、自动备份、读写分离等基础功能，PlanetScale 还提供像不停机不损失数据的 schema 回滚这样的高级功能。可惜 PlanetScale 在我们曾经慷慨的 Free Plan 已经一去不复返了，现在不再提供免费额度，但我们没有迁走选择继续使用。如果你想寻找免费替代品，那可以考虑一下 Neon 和 Supabase ，它们都基于 PostgreSQL 。
 - Clarity：微软出品的站点热力图和用户行为录制重放工具。Clarity 能很好的帮助开发者分析用户行为，发现产品的交互问题和错误。并且它是完全免费的，谢谢微软爸爸。此外 Clarity 还可以 connect 你的 Google Analytics ，在呈现 GA 数据的同时，还能筛选出对应流量背后的用户会话回放。
 - Tallyform：体验优秀、简单易用的表单工具。绝大多数功能免费且没有用量限制，用作反馈收集和 bug 报告等场景都非常方便。
 - Google Analytics：这个相信就不用过多介绍了，Google 出品的流量分析工具，当然也是免费的。
