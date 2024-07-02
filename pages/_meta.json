@@ -1,5 +1,6 @@
 {
   "index": "简介",
+  "update": "更新",
   "authors": "作者",
   "toc": "目录",
   "preface": "前言",
@@ -8,6 +9,7 @@
   "launch": "发布",
   "grow": "增长",
   "review": "复盘",
+  "appendix": "附录",
   "about": {
     "title": "更多",
     "type": "menu",
