@@ -1,0 +1,322 @@
+---
+title: Stripe 接入实践
+---
+Stripe 作为 LemonSqueezy 背后实际的支付平台，同时也是目前海外支付收款界的巨头，在能力和易用性上都比 LemonSqueezy 强出不少。但同样在复杂度上也高出一些。
+
+在这里给大家分享一下 Podwise 实际接入 Stripe 的过程和使用场景，特别是一些仅看文档很难了解到的细节，希望能帮助大家少走弯路。
+
+本文大概会涉及到这些方面：
+- 创建商品和定价，创建优惠码
+- 通过 API 发起购买
+- 改变用户订阅的 Plan
+- 允许用户取消、恢复订阅
+- 处理用户退款请求
+- 接入 Webhook 以便收到单次购买、订阅开通/修改/过期、退款等的通知
+- 开启支付宝和微信支付
+- 使用 customer portal 自带功能来简化你的开发
+
+## 主要概念
+
+本文中我们会涉及到这些 Stripe 中的概念：
+
+- Product - 商品
+- Price - 定价，一个商品可以有多个定价
+- Coupon & Promotion code - 优惠券和优惠码
+- Subscription - 订阅，本质上是对一个 Price 的循环收款
+- Checkout - 结账 / 付款，不论是单次购买还是进行订阅，都是走 checkout 来完成
+- Webhook - 事件回调
+- Customer - Stripe 中的客户，支付方式、订阅等都属于一个特定客户
+
+我们在自己平台的数据库中，需要存储来自 Stripe Webhook 的一些信息：
+- subscriptionId - 用户的当前订阅 id ，用于后续调用取消订阅、恢复订阅、改变订阅 Plan 等场景
+- customerId - 用户在 Stripe 的客户 id ，在跳转 customer portal 的时候有用
+- subscription status - 当前订阅状态，方便我们判断用户当前订阅是否可用
+- priceId - 用来映射平台的 Plan ，例如是 Standard 还是 Pro
+
+先大概看个眼熟，下面会提到这些内容。
+
+## 创建商品、定价和优惠码
+
+商品（Product）、定价（Price）和优惠码（Coupon & Promotion code）都可以在 Stripe dashboard 的 Product catalog 下管理。
+
+这几个概念的相互关系是：
+- Pricing 属于 Product ，一个 Product 下面可以有多个 Prices
+- Promotion code 属于 Coupon ，一个 Coupon 下面可以有多个 Promotion codes
+- Coupon 可以作用于 Products ，不能只作用于特定 Price
+
+一些重要的事实是：
+- 用户购买的最细粒度实际上是 Price
+- Price 可以是 recurring 即循环收款的（也就是用来实现订阅），也可以是 one-off 一次性的（用来售卖单次的商品或服务）
+- 一个 Price 下还可以有多个 currency ，针对不同货币进行不同定价（这里和开启支付宝、微信支付相关，后面会讲到）
+
+由于用户实际购买的最细粒度是 Price ，但 Coupons 却仅能作用于 Products 粒度，这在我看来是不太合理的。所以在创建 Products / Prices 的时候我们需要关注一下我们自己对优惠策略的需求。这个等会儿在下面会讲到，我们先来关注一下 Stripe 官方推荐如何定义 Products / Pricing 。
+
+在 Stripe 官方文档中是这么描述 Products 和 Pricing 的：
+
+> Products describe the specific goods or services you offer to your customers.
+>
+> - If you’re an e-commerce store selling clothing, one of your products might be a large white t-shirt. In Stripe, you can create a separate product for each size and color combination.
+> - If you’re a SaaS platform, you might have basic and premium pricing tiers. In this case, both basic and premium are separate products because they typically offer unique attributes or features.
+> - If you’re a donation platform that accepts donations for several different causes, each cause is a different product
+>
+> You can create as many products as you need to represent your product catalog. You can also create multiple prices for each product. Whether you should create multiple products as opposed to multiple prices depends on several factors. Generally, however, you want to:
+>
+> - Create multiple prices for a single product if you’re selling the same item at different price points. For example, if you offer a subscription tier at monthly and yearly rates, create one product for the tier and one price for the monthly rate and another for the yearly rate. See an example of this for a [good-better-best flat rate pricing model](https://docs.stripe.com/products-prices/pricing-models#flat-rate). (If you’re selling the same item in different currencies, then instead of creating multiple prices, create a single [multi-currency Price](https://docs.stripe.com/products-prices/pricing-models#multicurrency "multi-currency price").)
+>
+> - Create multiple products if the items require different provisioning or fulfillment in your application. In the [good-better-best](https://docs.stripe.com/products-prices/pricing-models#flat-rate) model, for example, you would create a different product for each tier. Similarly, if you have different versions of a product, like different colors or sizes of a t-shirt, you would create a product for each version.
+
+以 Podwise 举例的话，不同的 Plan（Standard / Pro）就可以是不同的 Products ，而不同的订阅周期（月付/年付/单次）就是 Product 下的 Prices 。
+
+因此我们按照 Stripe 的最佳实践会创建 2 个 Products ，每个下面 4 个 Prices 。
+- Product: Standard
+	- Price: Monthly
+	- Price: Annually
+	- Price: 1 Month (one-off)
+	- Price: 1 Year (one-off)
+- Product: Pro
+	- Price: Monthly
+	- Price: Annually
+	- Price: 1 Month (one-off)
+	- Price: 1 Year (one-off)
+
+其中 Monthly 和 Annually 的 Prices 用来实现持续订阅，而两个 one-off Prices 则是为了照顾国内用户使用支付宝和微信支付的需求。因此我们将订阅 Prices 设置为 USD 价格，而将一次性的两个 Prices 设置为 CNY 价格（后面会说明为什么需要设置成 CNY 价格）。
+
+### Product 组织方式对 Coupon 的影响
+
+但这样的组织形式会出现一个问题，即我只能针对 Standard 或针对 Pro 创建 Coupon ，而不能针对年付这个订阅周期来创建 Coupon 。
+
+我们可能会希望做一个优惠码，针对 Standard 的年付和 Pro 的年付计划来优惠，从而吸引更多用户选择年付方案从而更快回笼资金。
+我们也可能会希望做一个折扣力度很大的优惠码，但仅对 Standard 的月付的首月生效，来吸引用户首次尝试我们产品的付费 features 。
+
+这种场景，按上述方式组织 Products & Prices ，都是做不到的。因此目前 Podwise 是按如下的方式组织的：
+- Product: Standard Monthly
+	- Price: recurring
+	- Price: one-off
+- Product: Standard Annually
+	- Price: recurring
+	- Price: one-off
+- Product: Pro Monthly
+	- Price: recurring
+	- Price: one-off
+- Product: Pro Annually
+	- Price: recurring
+	- Price: one-off
+
+> 💡 请记得先在 Stripe dashboard 右上角打开 Test mode 的开关，在 Test mode 下创建 Products 等，并测试完成后，再 copy to live mode 。
+
+## 通过 API 发起购买
+
+现在产品已经创建好了，我们希望用户能去购买花钱了。这时候有两种做法，一种是使用 Stripe 的 Payment links 功能，从 Price 创建一个付款链接发给用户，让他付款。另一种则是通过 Stripe 的 API 将用户引导到 Stripe 的收银台进行付款。
+
+显然作为开发者我们不会用第一种方式，这里我们需要用到的 API 接口是 `checkout.sessions.create`（[文档](https://docs.stripe.com/api/checkout/sessions/create)）。
+
+**注：以下所有 API 接口名称都是 Node.js SDK 的命名。**
+
+`checkout.sessions.create` 主要接收 priceId 、quantity 、mode（payment/subscription/setup）这些参数，然后返回一个 session 对象。其中最主要的返回值是 `url` ，即 Stripe 的收银台地址。
+
+我们只需要在新窗口打开这个 url（或者也可以用 iframe 的方式嵌入，Stripe 提供了这个模式，详细请参考文档），用户就可以在新窗口中完成购买行为。随后我们就可以通过 Webhook 接收到购买的结果，从而为用户进行履约。Webhook 的部分我们在下一节讲。
+
+> 💡 需要注意的是，`checkout.sessions.create` 的入参中有一个参数 `success_url` ，用作付款成功后的跳转。请**不要依赖这个跳转**来作为付款成功的回调，而是使用 Webhook 。这是一个前端跳转，缺乏安全性的同时，也不能保证用户不会在付款后立即关闭窗口导致不触发跳转。
+
+### 使用 metadata 和 subscription_data.metadata 传递用户信息
+
+为了在收到 Webhook 回调时知道是哪个用户购买的产品，我们需要将 `userId` 在 checkout 的时候传递给 Stripe ，并最终在 Webhook 的时候重新获取。
+
+尽管在付款时也可以要求用户输入邮箱地址，我们再从邮箱地址来对应我们自己平台的用户，但这种方式并不是很保险。因为你无法保证用户会输入和你的平台注册地址相同的邮箱地址（不过你也可以在 `checkout.sessions.create` 时传入邮箱地址）。
+
+我们可以使用 metadata 来传递我们自己平台的 `userId` ，只需要在调用 `checkout.sessions.create` 时这样传入即可：
+```typescript
+  const session = await stripe.checkout.sessions.create({
+    client_reference_id: referenceId,
+    customer_email: user.email,
+    line_items: [
+      {
+        price: params.priceId,
+        quantity: params.quantity,
+      },
+    ],
+    mode: params.mode,
+    metadata: {
+      userId: user.id,
+      priceId: params.priceId,
+      quantity: params.quantity,
+    },
+    subscription_data: params.mode === 'subscription' ? {
+      metadata: {
+        userId: user.id,
+      },
+    } : undefined,
+  });
+
+  // 获得 url 后即可跳转支付，你可以在前端跳转，也可以在后端跳转
+  const redirectUrl = session.url;
+```
+
+大家可以注意到我在 metadata 里除了 `userId` 之外还塞了 `priceId` 和 `quantity` ，这个在下面的 Webhook 那一小节会解释。
+
+对于 one-off 的购买，只设置 checkout.session 的 metadata 就够了，因为我们通过 `checkout.session.completed` 这个 Webhook event type 就可以走完业务逻辑。但对于 subscription 订阅，只设置 checkout.session 的 metadata 并不足够。对订阅来说，后续我们需要通过 `customer.subscription.*` 的几个 Webhook events 来进行业务逻辑处理。我们是通过 checkout 来引导用户付款，同时创建了 subscription 。**但 checkout.session 和 subscription 是不同的对象，metadata 也不同**，因此我们需要通过 `subscription_data.metadata` 字段来为 subscription 对象同样设置我们需要的 metadata 。
+
+所以可以看到我在上面的代码例子中，在 `subscription_data.metadata` 中也设置了 `userId` 作为回调时匹配平台用户的依据。
+
+> 💡 记得在调用 `checkout.sessions.create` 的时候，同时也为 subscription 设置 metadata 。
+
+> 💡 我没有在 `subscription_data.metadata` 中设置 `priceId` ，是因为 subscription 是可以改变订阅的 price 的。
+
+## 用户改变订阅的 Plan
+
+最简单的方式是在 Settings -> Billing -> Customer portal 中打开 Customers can switch plans 的开关，然后引导用户去 customer portal 完成这个动作。但同时我们也可以选择自制界面然后通过调用 Stripe API 的方式来完成。
+
+customer portal 将会在后面的小节中提到。
+
+在 Stripe 中，要改变一个用户订阅的 Plan ，实际上就是修改该 subscription object 中的 subscription item object 。通过修改 subscription item 中的 `price` 为另一个 priceId ，即可完成 Plan 的变更。Stripe 会自动处理差额的问题。
+
+> 💡 差额具体会怎么处理有多种策略，默认会在下个周期的账单中体现，但也可以选择立即结束当前周期产生新账单。这部分比较复杂，建议仔细阅读官方文档。
+
+那么我们需要做的就是通过用户的 subscriptionId 用 `subscriptions.retrieve` 查询到 subscription item ，然后用 `subscriptionItems.update` 来修改即可。
+
+- [subscriptions.retrieve 文档](https://docs.stripe.com/api/subscriptions/retrieve)
+- [subscriptionItems.update 文档](https://docs.stripe.com/api/subscription_items/update)
+
+## 用户取消 / 恢复订阅
+
+这个功能同样可以在 Customer portal 中完成，并且默认是开启的。同样我们在这一小节先讨论通过 Stripe API 来完成的方式。
+
+首先很重要的一点是，Stripe 在**取消订阅时有两种不同的策略**。第一种策略是 Cancel immediately ，立即取消。这种策略会马上使用户的订阅失效，你的 Webhook 会即时收到一个 `customer.subscription.deleted` 事件。这种取消方式往往发生在因为某些原因我们需要为用户退款，同时结束用户的会员资格时。
+
+而绝大部分时候，我们希望使用的是第二种策略：Cancel at end of billing period ，也就是在这个订阅周期结束时候取消。换句话说就是不再续订。这种策略下我们不需要为用户退款。
+
+而这两种取消策略在 API 的调用上是两个不同的接口。
+
+立即取消使用 API `subscriptions.cancel`（[文档](https://docs.stripe.com/api/subscriptions/cancel)）来完成。需要注意的是这个 API 并不会帮你向用户退款未履约的部分，你仍然需要额外的操作来为用户退款。
+
+> 💡 另一个 API `subscriptions.resume` 看起来很像是和 cancel 成对的 API ，但实际上并不是。resume 的作用是将 paused 状态的订阅重新激活，请注意区别。
+
+不再续订则需要我们使用更新订阅的 API：`subscriptions.update`（[文档](https://docs.stripe.com/api/subscriptions/update)），将字段 `cancel_at_period_end` 设置为 `true` 。同理恢复续订则是把该字段设置为 false 。
+
+也因此当你自己的界面想要显示用户是否已经不再续订时，请在 Webhook 收到事件时将 `cancel_at_period_end` 字段记录下来。在 subscription object 的 `status` 中的值，不论是 `canceled` 还是 `paused` 都**不代表**不再续订的意思。
+
+> 💡 总之不要被 `subscriptions.cancel` 和 `subscriptions.resume` 这两个 API 的名字迷惑了，它们很可能不是你想要用的那两个 API 。
+
+## 处理用户退款请求
+
+Podwise 让用户发送邮件来申请退款，而不是在页面中自助发起。自助退款可能对用户体验会更好，但邮件退款申请给了我们一次收集用户意见并和用户交流的机会，且实现起来更加简单。
+
+如果你想提供自助退款的能力，那么 API `refunds.create`（[文档](https://docs.stripe.com/api/refunds/create)）将是你的选择。这部分因为我们没接，就不展开了。
+
+对于 subscription 的退款请求，Stripe 提供了取消订阅 + 退款的一站式功能。你只需要在 Stripe dashboard 的 Subscriptions 菜单中找到需要退款的订阅，并点击 Cancel subscription 。然后在弹出菜单中选择 Immediately ，并选择退款是退最后一次付款还是退当前周期未履约的差价。
+![[CleanShot 2024-06-20 at 18.35.09@2x.png]]
+
+通过 Cancel 来进行退款会触发订阅取消的 Webhook 事件，因此只要你接了对应的事件，就无需再在自己的系统这边进行处理了。
+
+而对于一次性付款的退款请求，则需要对 payments 进行退款。在 Stripe dashboard 的 Payments 菜单下找到对应的付款记录，然后选择 Refund payment 就可以退款，并且可以自选退款金额。
+
+而对于这种一次性付款的退款，我们可以通过 Webhook `charge.refunded` 事件来监听。具体会在下一节里讨论。
+
+> 💡 需要注意的是，在 Payments 菜单下也可以对订阅的付款进行退款，但从这里退款并不会取消订阅，需要再到 Subscriptions 中去取消一下。
+
+## 接入 Webhook
+
+通过 Stripe 右上角的 Developer 功能入口，我们可以进行 Webhook 的创建和配置。不过在配置线上环境的 Webhook 之前，我们可以利用 stripe cli 和 Stripe 的 Test mode ，首先在本地调试 Webhook 。
+
+stripe cli 的安装和登录请参考[文档](https://docs.stripe.com/stripe-cli#install)。
+
+完成安装后，我们就可以使用 stripe cli 来将我们的本地端口连上 Stripe 的测试环境，从而接收到 Webhook 。
+
+对我们的场景来说，目前我们关心了这 4 个 Webhook events ：
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+
+此外还有一个退款相关的 event `charge.refunded` ，虽然我们没有用，但也会提到。
+
+我们本地调试时使用的 stripe cli 命令供参考：
+```shell
+stripe listen --events checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted --forward-to localhost:3000/api/webhooks/stripe
+```
+
+### one-off payment ，单次付款购买
+
+我们通过 `checkout.session.completed` event 来处理单次付款购买的业务。
+
+`checkout.session.completed` 会在用户完成 checkout.session 的付款后触发，我们用这个事件来处理一次性付款购买的情况。如果用户使用会延迟确认付款的付款方式，则可能在用户付款成功前该事件就会触发。不过大部分付款方式都是即时确认的，因此我们没有考虑这种情况，我们就简单认为这个事件触发时，用户已经付了钱了。
+
+> 💡 付款方式是否是即时确认的，可以通过 Stripe dashboard 的 settings -> payments -> payments method ，展开特定支付方式详情，查看 Confirmation 字段是否为 Immediate 来确定。
+
+那么我们需要做的就是在从 Webhook 接收到 `checkout.session.completed` 事件的时候，从事件中获取到 `userId` 、`priceId` 和 `quantity` ，即可完成我们的业务流程。例如为用户开通一次性的会员资格，或者充值特定数量的 tokens 等。
+
+在 `checkout.session.completed` 这个 Webhook 回调中，默认并不存在用户购买的 `priceId` 和 `quantity` 信息。
+
+这部分信息存储在 session object 的 `line_items` 字段中。在文档我们可以看到 session object 中的 line_items 被标注为 **expandable** ，因此默认不会返回，也不在 Webhook 中出现。你需要使用 API `checkout.sessions.retrieve` 并传入 `{expand: ['line_items']}` 才能获取到用户在这个 checkout 中购买的具体内容。
+
+因为我们的场景很简单，用户一次只会购买一样东西，所以直接将 `priceId` 和 `quantity` 塞到 metadata 中，然后在 Webhook 时直接获取会更加方便一些。当然你也可以选择在收到回调之后重新用 retrieve + expand 获取一次。
+
+### subscription 订阅购买
+
+当用户订阅时，虽然在完成首次付款开通订阅的时候也会产生 `checkout.session.completed` 事件，但无法满足后面订阅生命周期状态改变时的同步需求，因此我们需要监听和 subscription 相关的事件才行。
+
+我们目前监听这三个事件：
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+
+> 💡 同 `line_items` 类似，在 session object 中，可以通过 expandable 的 `subscription` 字段拿到 subscription object 的信息，但 `customer.subscription.created` 事件更直接，我们可以直接使用这个事件。
+
+一个无试用期的订阅生命周期会收到的事件过程是这样的：
+1. 用户在 checkout 中提交了付款，`customer.subscription.created` 触发，`status` 为 `incomplete` 。
+2. 用户付款确认成功，`customer.subscription.updated` 触发，`status` 为 `active` 。
+3. 用户选择 Cancel (at the end of period) ，`customer.subscription.updated` 触发，`cancel_at_period_end` 为 `true` 。
+4. 用户选择 ReSub ，`customer.subscription.updated` 触发，`cancel_at_period_end` 为 `false` 。
+5. 用户变更订阅的 Plan ，`customer.subscription.updated` 触发，`items` 中的 `price` 改变。
+6. 用户取消订阅后订阅到期 / 或多次扣款失败后订阅停止，`customer.subscription.deleted` 触发 。
+
+> 💡 当你的产品有免费试用时，你收到的事件中的 `status` 可能和上述举例不同，请自行验证一下。
+
+- 对于 `status` 为 `incomplete` 的 created 事件，我们可以选择忽略。因为用户还未成功付款，我们也无需为用户开通服务。
+- 在收到 updated 事件时，在 event object 中会有一个 `previous_attributes` 字段，记录了发生变化的字段之前的值是什么。我们可以结合这个字段来判断订阅到底发生了什么变化。例如判断订阅是从无效状态变成了有效状态，从而为用户开通服务。又或者判断订阅的 priceId 发生了变化，从而改变用户的 Plan 。（当然我们可以在每次收到事件时在自己的数据库中存储起来，用我们自己数据库中的值和收到的新事件的值进行比较。）
+- 建议在收到事件时将 customerId 记录下来，后续可以让用户访问 Stripe customer portal 。
+- 收到 deleted 事件则表示用户订阅失效，可以关闭用户在我们平台的服务了。
+
+> 💡 Stripe 的 Webhook events 不保证不会重复投递，因此请做好幂等控制。
+
+### 退款并关闭服务
+
+对于订阅类的退款，前面也提到可以通过 Cancel Subscription 来完成，所以`customer.subscription.deleted` 事件自然会触发，我们也因此可以自动关掉用户的服务。
+
+但对于一次性付款开通的服务，就需要借助 `charge.refunded` 事件了。
+
+`charge.refunded` 中的 charge object 有 expandable 的字段 payment_intent 。一旦我们得知 payment_intent_id 之后，我们就可以使用 `checkout.sessions.list`（[文档](https://docs.stripe.com/api/checkout/sessions/list)）这个 API 反查这笔付款具体购买的 Product 和 Price 。同时我们也能在 checkout session object 中找到我们放在 metadata 中的 userId ，以便处理我们的业务逻辑。
+
+## 开启支付宝和微信支付
+
+支付宝和微信支付默认都仅支持一次性付款，不支持订阅。支付宝的 recurring payments 可以通过向客服申请并递交材料通过审核的方式来开通（这并不容易），但微信支付是完全不支持的。
+
+因此如果你需要考虑国内用户的付费情况，那就有必要设计一套非订阅制的收费模式。
+
+首先我们需要到 Stripe 的 Settings -> Payments -> Payment methods 中找到 Alipay 和 WeChat Pay 。这两项默认是没有激活的，我们点击后面的 Turn on ，等待即可。
+
+> 💡 在 Test mode 下 turn on 会立即 active ，你就可以开始联调测试了。但在正式环境下，turn on Alipay 和 WeChat Pay 会进入一个 pending 的状态。此时耐心等待即可，大概在几个小时内就会成功 active 。
+
+一旦成功开启之后，我们可以先点击后面的 `...` 按钮查看一下 Alipay 和 WeChat Pay 的 customer rules 。主要是允许的金额范围、支持的币种和支持的地区。只有这些规则全部通过，对应的支付方式才会出现在用户的收银台界面上。而我们最需要关注的就是支持的币种。
+
+不出意外的话，支持的币种肯定会有 CNY ，然后可能还会有你公司所在国家的币种。我们需要在收银台提供支持的币种价格，才能使支付宝和微信支付出现。
+
+为 Product 单独创建一个币种为 CNY 的 Price ，使用这个 priceId 发起 checkout session ，不出意外支付宝和微信支付将会出现在用户的收银台上。
+
+> 💡 记得为你的 Price 选择 One-off 类型，而不是 Recurring 类型。
+
+## 启用 Customer Portal
+
+Customer Portal 是 Stripe 提供的一个供客户使用的操作界面，这个 portal 提供这些功能：查看历史账单、修改客户联系信息/税号等、修改付款方式、取消/续期订阅、改变订阅的 Plan 。
+
+这些功能如果我们自己开发还是比较麻烦的，但只需要将用户引导到 Stripe Customer Portal ，就无需自己开发这些功能了。
+
+在开始之前，我们需要先启用这个 Customer Portal 。首先到 Settings -> Billing -> Customer portal 根据需要修改设置后保存设置。
+
+> 💡 即便你什么设置都没有改，也一定要点击一下 `Save changes` ，只有这样 Customer Portal 才会被激活，才能被使用。
+
+然后我们要做的就是在我们的应用中设置一个入口（例如就叫 Manage your subscription），并在用户点击的时候调用 API `billingPortal.sessions.create` 生成一个一次性 url ，跳转即可。
+
+这个 API 需要传入 customerId ，而这个 customerId 我们可以通过 Webhook 在 `customer.subscription.created` 等事件中获得。也因此这个一次性 url 无需用户再登录，即可准确的查看和管理自己的数据。
+
+> 💡 在 Customer Portal 设置界面有一个功能是：Launch customer portal with link 。它会生成一个供用户直接访问的链接，但这个链接需要用户自行登录，没有通过 API 获取 portal url 的方式方便。
