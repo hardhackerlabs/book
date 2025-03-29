@@ -1,0 +1,196 @@
+---
+title: Capacitor & Next.js 开发 App 实战 Part I
+---
+
+## 前言
+
+>❗说在最前面：这并不是一个好的技术栈选择（Capacitor 不是主要问题，问题是 Capacitor + Next.js 的组合），你可能会碰到很多未知的问题。只能说在当时的我们看来它是一个还可以的选择。如果你也在考虑这个技术栈，可以看看这篇文章。
+
+作为独立开发者或者小团队，在上 Mobile App 的时候，由于开发资源有限，一般都会考虑跨平台方案。例如 ReactNative 、Flutter 等，也包括今天说的 **Capacitor** 。
+
+Capacitor 是 Ionic Team 做的，前身可以认为是 Cordova ，本质上是 Web 包壳。相对 ReactNative 或 Flutter 这样的技术来说，Web 包壳在体验上可能会稍差一些，但好处是可以直接复用 Web 版的应用，或者其中的很多代码。
+
+但 Capacitor 也有自己的适用范围，并不是所有 Website 都可以不做任何改造就用 Capacitor 包装成 Mobile App 。其中一个限制就是被包装的 Website 必须是个**纯静态站点**。当然这里所说的纯静态站点并不是指不能有动态内容，而是不支持像 SSR 那样的服务端动态内容。换句话说，你的应用可以是一个 SPA ，或者多页但所有数据交互和呈现都通过 Ajax + 客户端渲染来完成。
+
+这个限制对 Next.js 是一个很大的问题，因为 Next.js 的默认范式就是 SSR 优先的，而我们有时候也确实会更倾向于使用 SSR 。那如果我们一开始选择了 Next.js 来构建我们的 Web 版 App ，并且大量采用了 SSR ，我们还能用 Capacitor 包成移动端应用吗？如果可以，怎么才能更简单更高效？
+
+Podwise 就遇到了这个问题。Podwise 最初为了快速上线选择了 Next.js 开发 Web 版本，同时用响应式的方式支持了移动端浏览器打开的可用性。后续随着用户量增加，用户对 Mobile App 的呼声也越来越高，我们就打算选择 Capacitor 包装的方案。随后我们发现网络上几乎没有真正可用的 Next.js + Capacitor 的教程，能找到的都只是最简单的 demo 场景，根本不涉及到 SSR 改造这样的核心问题。但好在我们在一路摸索中解决了不少问题，已经基本完成了 Mobile App 的开发。在这里把这部分经验分享给大家，这并不一定是最佳实践，权当抛砖引玉供大家参考。
+
+---
+Next.js + Capacitor 开发 App 的内容会分为多个部分。Part I 是 Next.js 工程改造，适配 Capacitor ；后续部分我们会继续分享如何对接各种原生能力，以及如何让 App 在移动设备上拥有更好的体验。
+
+## Part I - Next.js 工程改造
+
+我们需要使用 Next.js 的 static exports 功能来将整个应用导出成一份不含服务端逻辑的纯前端工程。static export 的文档可以参考这里：https://nextjs.org/docs/app/building-your-application/deploying/static-exports 。
+
+然后不出意外的，这里列出了一堆 Next.js 在 static exports 下不支持的特性，很多都非常常用，需要我们进行处理。让我们一项一项来。
+
+### Dynamic Routes with `dynamicParams: true` and without `generateStaticParams()`
+
+这指的就是动态的 SSR 。典型例如我们通过 `app/items/[itemId]/page.tsx` 来开发一个商品展示页面，Next.js 会在每一次用户访问 `/items/{itemId}` 的时候，动态在服务端获得 itemId ，并通过 SSR 生成页面内容。由于 static exports 会导出纯静态内容，不存在服务端，因此这项特性就无法被使用。
+
+使用了 `generateStaticParams()` 的 Dynamic Routes 是可以在 static exports 的时候支持的，因为 `generateStaticParams()` 在 build 的时候就枚举了所有可能的 Dynamic Segments（在我们的例子中是所有的 itemId），并为每一个路径生成了静态的 html 文件。但这样我们就失去了动态性。
+
+因此我们需要使用 CSR 的方式来动态获取数据并渲染页面。
+
+如何开发 CSR 的细节不在本文的讨论范围内，不详细展开。我们来聚焦几个需要决策和解决的问题。
+
+#### 1. 我应该把整个工程改造都改造成 CSR（即在 Web 实现中也使用 CSR），还是仅针对 Mobile App 改造 CSR ？
+
+在 Web 端使用 SSR 有两个好处。其一是**对 SEO 友好**，其二则是**对用户体验友好**。如果你计划让 Search Engine 成为你的一大流量来源，那么通过 SSR 来向搜索引擎喂数据，以及提高搜索引擎对你的站点的权重就非常重要。此外 SSR 能在一次 http 交互中返回可供用户查看的内容，对用户体验会带来一定的好处。
+
+如果这两点都不是你关心的，那么把整个工程都改造成 CSR 也不错，否则你就需要为 Web 端保留 SSR ，然后对 Mobile App 端进行 CSR 改造。这会让你需要使用两份代码。
+
+我们选择了为 Web 端保留 SSR 的方式。针对需要使用两份代码的问题，我们目前是这么实践的：
+- 为 Mobile App 再创建一个独立的 Next.js + Capacitor 工程，并通过自定义脚本选择性的从原工程中同步文件。这些文件主要是各种页面和 UI 组件，以及静态资源等。不包括例如 `route.ts` 这类提供 API 的文件或者其它 server 端的文件。
+- 对 SSR 的 `page.tsx` 进行改造，将实际页面内容剥离成独立的 `page_content.tsx` 组件，`page.tsx` 仅承担读取数据并传入 `<PageContent />` 的职责。在 Web 端工程中，`page.tsx` 通过 Server Component 的方式直接以 async/await 的方式读取数据；在 Capacitor 工程中，`page.tsx` 使用 swr 用 hooks 的方式读取数据。因此在两个工程中仅 `page.tsx` 文件不同，且两个文件中都只有几行获取数据的代码，不包含别的逻辑。
+
+#### 2. 解决两边内部 url 不一致的情况
+
+由于 static exports 不支持 Dynamic Segments ，因此 `/items/{itemId}` 这样的 url 无法使用，需要被改造成类似 `/items/index?itemId={itemId}` 这样使用 query params 的形式。这会导致在应用内部跳转时，Web 端和 Mobile 端的目标地址不同。我们肯定不希望在每个内链的地方都使用两份代码，因此需要对 Next.js 的 Link 组件进行改造。
+
+我们对 Link 组件进行了包装，将其 API 改造成了如下的方式：
+```tsx
+<Link
+  href={{
+    path: '/items/[itemId]',
+    segments: { itemId: 'someItemId' }
+  }}
+>
+  Item
+</Link>
+```
+
+在包装 Link 组件的内部，我们通过环境变量控制真实 href 是 Web 端还是 Mobile 端的拼接逻辑。当 Web 端时，segments 中的参数会替换 path 中的 `[itemId]` 占位符，最终输出 `/items/someItemId` 。当 Mobile 端时，path 中的占位符会被忽略，并在 path 后拼上 `segments?itemId=someItemId` ，最终输出 `/items/segments?itemId=someItemId` 。
+
+也因此在 Web 端工程中，上述例子对应的 `page.tsx` 是 `app/items/[itemId]/page.tsx` 。而在 Mobile App 工程中，则对应 `app/items/segments/page.tsx` ，这属于我们自己的约定。
+
+包装后的 Link 代码供参考：
+```typescript
+import { IS_APP } from '@/lib/tools';
+import NextLink from 'next/link';
+
+type HrefConfig = string | { path: string, segments: Record<string, any>, extra?: Record<string, any> }
+type Props = Omit<Parameters<typeof NextLink>[0], 'href'> & { href: HrefConfig };
+
+export function getHrefString(href: HrefConfig) {
+  if (typeof href === 'string') {
+    return href;
+  }
+  const { path, segments, extra } = href;
+  let formattedPath = path;
+  if (IS_APP) {
+    for (const key in segments) {
+      formattedPath = formattedPath.replace(`/[${key}]`, '');
+    }
+    const query = new URLSearchParams(segments).toString();
+    let result = `${formattedPath}/segments?${query}`;
+    if (extra != null) {
+      const extraQuery = new URLSearchParams(extra).toString();
+      result += `&${extraQuery}`;
+    }
+    return result;
+  }
+  for (const key in segments) {
+    formattedPath = formattedPath.replace(`[${key}]`, segments[key]);
+  }
+  if (extra != null) {
+    const extraQuery = new URLSearchParams(extra).toString();
+    formattedPath += `?${extraQuery}`;
+  }
+  return formattedPath;
+}
+
+export default function Link(props: Props) {
+  const { href, ...rest } = props;
+  const realHref: string = getHrefString(href);
+
+  return <NextLink prefetch={false} href={realHref} {...rest}/>;
+}
+```
+
+#### 3. 不要使用 Server Actions
+
+Server Actions 是 Next.js 提供的一种同构的进行前后端调用的技术，使用 Server Actions 可以让你像本地调用一样从 client 发起向 server 端的调用。Server Actions 不仅非常方便，省略了 API 层的代码，并且在使用 TypeScript 时还能为前后端之间的 API 调用提供类型安全的能力。
+
+但是 Server Actions 也有其局限性，最大的问题是它只能在同一工程内被调用，不支持被外部调用。显然，我们的 Mobile App 无法通过 Server Actions 发起对 Web 端 server 的 API 调用。
+
+为了避免在每个调用 API 的地方维护两套代码，我们建议**不要使用 Server Actions** 。
+
+通过简单的封装，我们使用两个工具方法来为一个服务端方法生成 router handler 和 API caller ，并允许配置 server address 。借由这种方式，我们保留了类型安全调用的优点，并移除了绝大多数重复的制式代码。
+
+两个工具方法的代码，有需要的朋友可以找我们索要。
+
+#### 4. 解决 API 调用时的跨域问题
+
+Mobile App 向 Web server 发起的调用默认是跨域的。因为你的 Mobile App 实际上跑在一个浏览器中，因此会受到浏览器的跨域安全策略限制。
+
+解决办法是使用 Capacitor 官方的 http plugin 来发起请求。这个 plugin 会使用 native 能力来进行 http 请求从而绕过浏览器的跨域安全策略。具体请参考文档：https://capacitorjs.com/docs/apis/http 。
+
+值得注意的是，Capacitor http plugin 在发送 request 的时候，header 中默认不会带上 cookie ，如果需要，要自己传入：
+```ts
+const resp = await CapacitorHttp.request({
+  header: {
+    Cookie: document.cookie,
+  },
+  // other props
+});
+```
+
+另外这个 plugin 会同时 patch `fetch` API ，但它的内部实现细节仍然和 fetch 有所不同，你可能会遇到一些在 Web 端正常但 App 中异常的情况。
+
+所以另一个可行的方式是不使用这个 Capacitor http plugin ，而是在你的服务端允许你的 App 跨域，然后沿用原生 fetch 的实现。但你要解决跨域传递 cookie 的问题。
+
+### Router Handlers that rely on Request
+
+Router Handlers 即 `route.ts` 形式的路由。rely on Request 表示 router 根据请求不同进行不同的响应，因此是动态的。不依赖于 Request 的 Router Handlers 是可以被 static exports 支持的，它们会在 build 时被执行，然后输出成静态文件。
+
+Mobile App 不需要使用 Router Handlers（我们直接调用 Web 端的 Router Handlers 提供的 API ），因此只需要将这些 `route.ts` 文件从 Mobile App 的工程中排除掉即可。
+
+### Cookies
+
+这里指在 Server Components 或 Server Actions 或 Router Handlers 中读取 http requests 携带的 cookies 的 API 。由于改造后的 Mobile App 不会存在上述内容，因此也不会用到 server 端的 Cookies API ，也就无需特殊处理。
+
+### Rewrites & Redirects & Headers
+
+这三个都是 `next.config.js` 中的配置，都是在 server 端进行处理的，因此在 static exports 中不被支持。
+
+#### Rewrites
+
+我们使用 rewrites 配置来将独立部署的 blog 挂载到主站的 /blog 路径下。这么做的目的是为了 SEO ，将所有内容都集中在一个域名下。
+
+这个需求对 Mobile App 来说是不存在的，因此不需要处理，忽略即可。
+
+#### Redirects
+
+我们用 redirects 配置来处理一些默认跳转逻辑，例如将 `/dashboard` 跳转到 `/dashboard/trending` 。
+
+在 Mobile App 中我们通过增加一个 `app/dashboard/page.tsx` 路由，并简单在 `useEffect` 中使用 `router.replace('/dashboard/trending')` 来完成这个跳转逻辑。
+
+#### Headers
+
+Headers 主要为 API 服务，我们用 Headers 配置做了两件事：1. 设置 `X-Frame-Options` 为 `DENY` ；2. 为 Mobile App 调用 API 设置跨域头。
+
+这两个需求和 Mobile App 本身都无关，因此在 Mobile App 工程中不需要处理，忽略即可。
+
+### Middleware
+
+Middleware 也是在 server 端被执行的逻辑（在 deploy 到 Vercel 的时候，会放在 edge 执行），因此不被 static exports 支持。我们主要用 Middleware 做登录状态检查，当未登录时跳转登录界面或返回 401 。
+
+除了 Middleware 中的未登录跳转，为了用户体验，我们在 Web 端也同时做了 API 返回 401 时的未登录提示和跳转。因为在 Mobile App 的实现中我们已经将所有页面改造成了 CSR ，通过 API 来获取数据，正好能适配上对这个 401 的处理。因此在我们的场景下，无需再在 Mobile App 中针对 Middleware 做改造，忽略即可。
+
+### Incremental Static Regeneration & Draft Mode
+
+我们没有使用这两个特性。
+
+### Image Optimization with the default `loader
+
+为了更快的图片加载速度，Next.js 可以对图片进行优化，按照实际显示大小来返回最优尺寸的图片。这个优化对本地图片和你配置允许的远程图片都可以生效，但这个优化的默认实现发生在 server 端，也因此在 static exports 下无法生效。
+
+但在 Mobile App 场景下，所有工程中的本地图片都被打包在本地，不像 Web 端需要经过网络传输，因此这个图片优化行为对本地图片并不是很关键。你可以选择忽略它，不进行处理。
+
+而对受你控制的远程图片（例如存储在你的 AWS 上的图片），你可以通过自定义 loader 来自动利用这些存储服务的图片优化能力。Next.js 的官方文档提供了很多示例可供参考：https://nextjs.org/docs/app/api-reference/next-config-js/images#example-loader-configuration 。
+
+---
+
+至此我们已经完成了对工程的改造，已经基本可以运行了。但还有一些问题需要被解决，例如 oauth2 登录时如何正确回调到我们的 Mobile App 内部。同时我们可能还希望使用一些 native 能力加强我们 App 的体验，比如本地存储、push notification 以及接入平台自己的支付等。我们将在 Part II 继续分享我们在这部分的实践。
