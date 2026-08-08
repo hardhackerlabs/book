@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "next",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "export:obsidian": "node scripts/export-obsidian.mjs"
   },
   "dependencies": {
     "@next/third-parties": "^16.3.0",
