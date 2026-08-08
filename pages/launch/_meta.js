@@ -1,0 +1,5 @@
+export default {
+  acquire: '最初的 200 个用户',
+  feedback: '永远跟用户站在一起',
+  pricing: '定价要关注成本'
+}

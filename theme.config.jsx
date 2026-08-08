@@ -26,10 +26,10 @@ export default {
       </svg>
     )
   },
-  docsRepositoryBase: "https://github.com/hardhackerlabs/book/tree/main/",
+  docsRepositoryBase: "https://github.com/hardhackerlabs/book/tree/main",
   banner: {
     key: 'debut',
-    text: (
+    content: (
       <a href="/authors" target="_blank">
         🥳 加入「硬地骇客」知识星球，与作者和读者一起交流探讨！点击了解更多 →
       </a>
@@ -38,14 +38,18 @@ export default {
   head: () => {
     const { asPath, defaultLocale, locale } = useRouter()
     const { frontMatter } = useConfig()
+    const title = frontMatter.title
+      ? `${frontMatter.title} – 硬地骇客`
+      : '硬地骇客'
     const url =
       'https://book.hardhacker.com' +
       (defaultLocale === locale ? asPath : `/${locale}${asPath}`)
 
     return (
       <>
+        <title>{title}</title>
         <meta property="og:url" content={url} />
-        <meta property="og:title" content={frontMatter.title + " – 硬地骇客" || '硬地骇客'} />
+        <meta property="og:title" content={title} />
         <meta
           property="og:description"
           content={frontMatter.description || '两个月 $12000 ARR 实践之路'}
@@ -55,13 +59,6 @@ export default {
     )
   },
 
-  useNextSeoProps() {
-    const { frontMatter } = useConfig();
-
-    return {
-      titleTemplate: frontMatter.title + " – 硬地骇客",
-    };
-  },
   toc: {
     title: "目录",
     extraContent: <>
@@ -76,11 +73,11 @@ export default {
   </>,
   },
   editLink: {
-    text: ""
+    content: ""
   },
   // ... other theme options
   footer: {
-    text: (
+    content: (
       <span>
         Made with 💖 by ©{" "}
         <a href="https://hardhacker.com" target="_blank">
